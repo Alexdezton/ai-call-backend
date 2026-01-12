@@ -7,126 +7,179 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-// Store active sessions
-const sessions = new Map();
+// Store rooms for calls
+const rooms = new Map();
 
 wss.on('connection', (ws, req) => {
   console.log("client connected");
 
-  // Parse session ID from query parameter
+  // Parse user ID and room ID from query parameters
   const parsedUrl = new URL(`http://localhost${req.url}`);
-  const sessionId = parsedUrl.searchParams.get('sessionId');
+  const userId = parsedUrl.searchParams.get('userId');
+  const roomId = parsedUrl.searchParams.get('roomId');
 
-  // Generate a simple sessionId if none provided for testing
-  const finalSessionId = sessionId || `user${Math.floor(Math.random() * 100) + 1}`;
-  
-  if (!sessionId) {
-    console.log("No sessionId provided, generated:", finalSessionId);
+  // Both userId and roomId are required
+  if (!userId || !roomId) {
+    console.log("Connection rejected: userId and roomId are required");
+    ws.close(4001, "userId and roomId are required");
+    return;
   }
-  
-  console.log(`New connection: ${finalSessionId}`);
 
-  // Store the WebSocket connection
-  sessions.set(finalSessionId, ws);
+  console.log(`New connection: ${userId} in room ${roomId}`);
+
+  // Check if room exists
+  let room = rooms.get(roomId);
+  
+  if (!room) {
+    // Create new room with first user
+    room = {
+      [userId]: ws
+    };
+    rooms.set(roomId, room);
+    console.log(`Created new room: ${roomId} with user: ${userId}`);
+    
+    // Notify user they are waiting for a partner
+    ws.send(JSON.stringify({
+      type: 'waiting_for_partner',
+      userId: userId,
+      roomId: roomId
+    }));
+  } else {
+    // Room exists, check if there's space
+    const existingUsers = Object.keys(room);
+    
+    if (existingUsers.length >= 2) {
+      // Room is full
+      console.log(`Room ${roomId} is full, rejecting connection for ${userId}`);
+      ws.close(4003, "Room full");
+      return;
+    }
+    
+    if (existingUsers.includes(userId)) {
+      // User already in room
+      console.log(`User ${userId} already exists in room ${roomId}`);
+      ws.close(4004, "User already in room");
+      return;
+    }
+    
+    // Add second user to room
+    room[userId] = ws;
+    rooms.set(roomId, room);
+    console.log(`Added user ${userId} to existing room: ${roomId}`);
+    
+    // Get the other user in the room
+    const otherUser = existingUsers.find(u => u !== userId);
+    
+    // Notify both users that they are connected
+    room[otherUser].send(JSON.stringify({
+      type: 'partner_found',
+      userId: otherUser,
+      partnerId: userId,
+      roomId: roomId
+    }));
+    
+    ws.send(JSON.stringify({
+      type: 'partner_found',
+      userId: userId,
+      partnerId: otherUser,
+      roomId: roomId
+    }));
+    
+    console.log(`Users paired in room ${roomId}: ${otherUser} and ${userId}`);
+  }
+
+  // Store references to userId and roomId for later use
+  ws.userId = userId;
+  ws.roomId = roomId;
 
   ws.on('message', (data) => {
     try {
       const message = JSON.parse(data.toString());
       
-      if (message.type === 'session_info') {
-        // Обработка информации о сессии от клиента
-        console.log(`New session: ${message.sessionId} - My language: ${message.myLanguage}, Partner language: ${message.partnerLanguage}`);
-        // Сохраняем информацию о сессии
-        sessions.set(message.sessionId, {
-          ws: ws,
-          myLanguage: message.myLanguage,
-          partnerLanguage: message.partnerLanguage
-        });
-      } else if (message.type === 'openai_auth') {
-        // Mock OpenAI Realtime API for testing
-        console.log("OpenAI auth requested, using mock API");
-        // Send a mock response back to simulate successful auth
-        ws.send(JSON.stringify({
-          type: 'session.updated',
-          session: {
-            id: 'mock-session-id',
-            model: 'gpt-4o-realtime-preview-2024-10-01',
-            voice: 'alloy',
-            input_audio_format: 'pcm16',
-            output_audio_format: 'pcm16',
-            instructions: '',
-            turn_detection: { type: 'server_vad' },
-            tools: [],
-            tool_choice: 'auto',
-            temperature: 0.8,
+      // Log the message
+      console.log(`Received message from ${userId} in room ${roomId}:`, message);
+      
+      // Forward WebRTC signaling messages to the other user in the room
+      if (message.type === 'offer' || message.type === 'answer' || message.type === 'ice_candidate') {
+        const room = rooms.get(roomId);
+        if (room) {
+          // Find the other user in the room
+          const otherUser = Object.keys(room).find(u => u !== userId);
+          if (otherUser) {
+            // Forward the message to the other user
+            const recipientWs = room[otherUser];
+            if (recipientWs && recipientWs.readyState === WebSocket.OPEN) {
+              recipientWs.send(JSON.stringify(message));
+              console.log(`Forwarded ${message.type} from ${userId} to ${otherUser} in room ${roomId}`);
+            } else {
+              console.log(`Recipient ${otherUser} not available or not connected`);
+            }
+          } else {
+            console.log(`No other user found in room ${roomId} for forwarding ${message.type}`);
           }
-        }));
-      } else {
-        // Log all other incoming messages
-        console.log("Received message from client:", message);
-        
-        // Mock responses for various OpenAI Realtime API events
-        if (message.type === 'response.create') {
-          // Mock a response from OpenAI
-          ws.send(JSON.stringify({
-            type: 'response.done',
-            response: {
-              id: 'mock-response-id',
-              status: 'completed',
-              status_details: null,
-              output: [{
-                id: 'mock-output-id',
-                type: 'message',
-                role: 'assistant',
-                content: [{
-                  type: 'text',
-                  text: 'Mock response for testing purposes'
-                }]
-              }],
-              usage: {
-                total_tokens: 10,
-                input_tokens: 5,
-                output_tokens: 5
-              }
-            }
-          }));
-        } else if (message.type === 'conversation.item.created') {
-          // Mock response for item creation
-          ws.send(JSON.stringify({
-            type: 'conversation.item.created',
-            previous_item_id: null,
-            item: {
-              id: 'mock-item-id',
-              type: 'message',
-              role: 'assistant',
-              content: [{
-                type: 'text',
-                text: 'Mock item created'
-              }]
-            }
-          }));
         } else {
-          // Echo back other messages for testing
-          ws.send(JSON.stringify({
-            type: 'mock_response',
-            original_type: message.type,
-            status: 'received'
-          }));
+          console.log(`Room ${roomId} not found for forwarding ${message.type}`);
         }
+      } else {
+        // Handle other message types if needed
+        console.log(`Received non-WebRTC message from ${userId}:`, message);
       }
     } catch (error) {
       console.error("Error processing message:", error);
       // Don't close connection on error, just log it
+      // Send warning to frontend
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'warning',
+          message: 'Invalid JSON received',
+          error: error.message
+        }));
+      }
     }
   });
 
   ws.on('close', (code, reason) => {
-    console.log(`Client disconnected: ${finalSessionId}, code: ${code}, reason: ${reason}`);
-    sessions.delete(finalSessionId);
+    console.log(`Client disconnected: ${userId} from room ${roomId}, code: ${code}, reason: ${reason}`);
+    
+    // Remove user from room
+    const room = rooms.get(roomId);
+    if (room) {
+      delete room[userId];
+      
+      // Check if room is now empty or has only one user
+      const remainingUsers = Object.keys(room);
+      
+      if (remainingUsers.length === 0) {
+        // Remove empty room
+        rooms.delete(roomId);
+        console.log(`Removed empty room: ${roomId}`);
+      } else if (remainingUsers.length === 1) {
+        // Notify remaining user that their partner left
+        const remainingUser = remainingUsers[0];
+        const remainingWs = room[remainingUser];
+        
+        if (remainingWs && remainingWs.readyState === WebSocket.OPEN) {
+          remainingWs.send(JSON.stringify({
+            type: 'partner_disconnected',
+            userId: remainingUser,
+            partnerId: userId,
+            roomId: roomId
+          }));
+          console.log(`Notified ${remainingUser} that partner ${userId} disconnected from room ${roomId}`);
+        }
+        
+        // Update room state (only one user left)
+        console.log(`Room ${roomId} now has only one user: ${remainingUser}`);
+      }
+    }
+    
+    // Clean up connection reference
+    ws.userId = null;
+    ws.roomId = null;
   });
 
   ws.on('error', (error) => {
-    console.error("WebSocket error:", error);
+    console.error("WebSocket error for user", userId, "in room", roomId, ":", error);
   });
 });
 
