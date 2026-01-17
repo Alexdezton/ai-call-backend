@@ -70,7 +70,10 @@ class VoiceTranslationApp {
       
       if (!audioAccess) {
         alert('Не удалось получить доступ к микрофону');
-        this.isConnecting = false; // Сбрасываем флаг
+        // Сбрасываем флаг подключения с задержкой, чтобы избежать повторного быстрого нажатия
+        setTimeout(() => {
+          this.isConnecting = false;
+        }, 300);
         return;
       }
       
@@ -91,7 +94,10 @@ class VoiceTranslationApp {
         }
         
         // Сбрасываем флаг подключения, чтобы пользователь мог снова попробовать подключиться
-        this.isConnecting = false;
+        // Но устанавливаем небольшую задержку, чтобы избежать повторного быстрого нажатия
+        setTimeout(() => {
+          this.isConnecting = false;
+        }, 300); // 300мс задержки перед сбросом флага
         return;
       }
       
@@ -145,7 +151,10 @@ class VoiceTranslationApp {
         this.isInCall = false;
         this.isInRoom = false;
         this.hasPartner = false;
-        this.isConnecting = false; // Сбрасываем флаг подключения
+        // Сбрасываем флаг подключения с задержкой, чтобы избежать повторного быстрого нажатия
+        setTimeout(() => {
+          this.isConnecting = false;
+        }, 300);
         this.connectionStatusText.textContent = 'Disconnected';
         this.roomStatusText.textContent = 'Not in room';
         this.updateUI();
@@ -153,13 +162,19 @@ class VoiceTranslationApp {
       
       this.ws.onerror = (error) => {
         console.error('Ошибка WebSocket соединения:', error);
-        this.isConnecting = false; // Сбрасываем флаг подключения
+        // Сбрасываем флаг подключения с задержкой, чтобы избежать повторного быстрого нажатия
+        setTimeout(() => {
+          this.isConnecting = false;
+        }, 300);
         this.connectionStatusText.textContent = 'Error';
         this.updateUI();
       };
     } catch (error) {
       console.error('Ошибка при подключении:', error);
-      this.isConnecting = false; // Сбрасываем флаг подключения
+      // Сбрасываем флаг подключения с задержкой, чтобы избежать повторного быстрого нажатия
+      setTimeout(() => {
+        this.isConnecting = false;
+      }, 300);
       this.connectionStatusText.textContent = 'Connection Error';
       this.updateUI();
     }
@@ -173,7 +188,10 @@ class VoiceTranslationApp {
     this.isConnected = false;
     this.isInRoom = false;
     this.hasPartner = false;
-    this.isConnecting = false; // Сбрасываем флаг подключения
+    // Сбрасываем флаг подключения с задержкой, чтобы избежать проблем с быстрым переподключением
+    setTimeout(() => {
+      this.isConnecting = false; // Сбрасываем флаг подключения
+    }, 300);
     this.connectionStatusText.textContent = 'Disconnected';
     this.roomStatusText.textContent = 'Not in room';
     
@@ -209,7 +227,10 @@ class VoiceTranslationApp {
     } catch (error) {
       console.error('Ошибка при доступе к микрофону:', error);
       this.micStatusText.textContent = 'Error';
-      this.isConnecting = false; // Сбрасываем флаг подключения
+      // Сбрасываем флаг подключения с задержкой, чтобы избежать повторного быстрого нажатия
+      setTimeout(() => {
+        this.isConnecting = false;
+      }, 300);
       this.updateUI();
       return false;
     }
