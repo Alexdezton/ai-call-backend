@@ -96,6 +96,14 @@ class VoiceTranslationApp {
         return;
       }
       
+      // Закрываем предыдущее соединение, если оно существует
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.close();
+      } else if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
+        // Если соединение еще в процессе установления, также закрываем его
+        this.ws.close();
+      }
+      
       // Подключаемся к WebSocket серверу с параметрами userId и roomId
       const wsUrl = `ws://localhost:3000?userId=${encodeURIComponent(this.userId)}&roomId=${encodeURIComponent(roomId)}`;
       this.ws = new WebSocket(wsUrl);
