@@ -20,6 +20,7 @@ class VoiceTranslationApp {
     this.microphone = null;
     this.mediaRecorder = null;
     this.isConnecting = false; // Флаг для предотвращения повторного подключения
+    this.roomIdErrorDisplayed = false; // Флаг для предотвращения повторного отображения ошибки ввода Room ID
     
     // STUN сервер для WebRTC
     this.iceServers = [
@@ -79,7 +80,16 @@ class VoiceTranslationApp {
       const roomId = roomIdInput.value.trim();
       
       if (!roomId) {
-        alert('Please enter a Room ID');
+        // Проверяем, не отображается ли уже ошибка
+        if (!this.roomIdErrorDisplayed) {
+          alert('Please enter a Room ID');
+          this.roomIdErrorDisplayed = true; // Устанавливаем флаг, что ошибка отображена
+        
+          // Сбрасываем флаг через короткий промежуток времени, чтобы пользователь мог снова попробовать
+          setTimeout(() => {
+            this.roomIdErrorDisplayed = false;
+          }, 1000); // 1 секунды достаточно, чтобы пользователь отреагировал
+        }
         this.isConnecting = false; // Сбрасываем флаг
         return;
       }
@@ -93,24 +103,6 @@ class VoiceTranslationApp {
         console.log('Соединение с сервером установлено');
         this.isConnected = true;
         this.isConnecting = false; // Сбрасываем флаг подключения
-        this.connectionStatusText.textContent = 'Connected';
-        this.updateUI();
-        
-        // Отправляем информацию о пользователе на сервер
-        this.sendToServer({
-          type: 'user_info',
-          userId: this.userId,
-          myLanguage: document.getElementById('myLanguage').value,
-          partnerLanguage: document.getElementById('partnerLanguage').value
-        });
-        
-        // Запускаем измерение latency
-        this.startLatencyMeasurement();
-      };
-      
-      this.ws.onopen = () => {
-        console.log('Соединение с сервером установлено');
-        this.isConnected = true;
         this.connectionStatusText.textContent = 'Connected';
         this.updateUI();
         
