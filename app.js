@@ -69,7 +69,7 @@ class VoiceTranslationApp {
       }
       
       // Подключаемся к WebSocket серверу с параметрами userId и roomId
-      const wsUrl = `ws://localhost:3000?userId=${encodeURIComponent(this.sessionId)}&roomId=${encodeURIComponent(roomId)}`;
+      const wsUrl = `ws://localhost:3000?userId=${encodeURIComponent(this.userId)}&roomId=${encodeURIComponent(roomId)}`;
       this.ws = new WebSocket(wsUrl);
       
       this.ws.onopen = () => {
