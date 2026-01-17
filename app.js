@@ -59,7 +59,11 @@ class VoiceTranslationApp {
   }
   
   setupEventListeners() {
-    this.connectBtn.addEventListener('click', () => this.connectToServer());
+    this.connectBtn.addEventListener('click', () => {
+      // Отключаем кнопку на время подключения, чтобы предотвратить повторные клики
+      this.connectBtn.disabled = true;
+      this.connectToServer();
+    });
     this.disconnectBtn.addEventListener('click', () => this.disconnectFromServer());
     this.startCallBtn.addEventListener('click', () => this.startCall());
     this.stopCallBtn.addEventListener('click', () => this.stopCall());
