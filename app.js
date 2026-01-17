@@ -110,7 +110,11 @@ class VoiceTranslationApp {
       }
       
       // Подключаемся к WebSocket серверу с параметрами userId и roomId
-      const wsUrl = `ws://localhost:3000?userId=${encodeURIComponent(this.userId)}&roomId=${encodeURIComponent(roomId)}`;
+      // Используем правильный URL в зависимости от среды (локальная или Render)
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsHost = isLocalhost ? 'localhost:3000' : window.location.host.replace('http', 'ws');
+      const wsUrl = `${wsProtocol}//${wsHost}?userId=${encodeURIComponent(this.userId)}&roomId=${encodeURIComponent(roomId)}`;
       this.ws = new WebSocket(wsUrl);
       
       // Сбрасываем флаг подключения при успешном открытии соединения
