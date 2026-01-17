@@ -207,6 +207,7 @@
             <div class="controls">
                 <button type="button" id="connectBtn" class="btn-connect">Connect to Room</button>
                 <button type="button" id="disconnectBtn" class="btn-connect">Disconnect</button>
+                <button type="button" id="testBtn" class="btn-connect" onclick="testFunction()">Test Button</button>
             </div>
             
             <div class="status-indicators">
@@ -268,6 +269,11 @@
                         console.log('Ошибка регистрации SW: ', error);
                     });
             });
+        }
+        
+        // Тестовая функция для проверки, что изменения применяются
+        function testFunction() {
+          alert('Привет! Изменения применяются.');
         }
     </script>
 </body>
