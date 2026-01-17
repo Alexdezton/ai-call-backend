@@ -19,6 +19,7 @@ class VoiceTranslationApp {
     this.audioProcessor = null;
     this.microphone = null;
     this.mediaRecorder = null;
+    this.isConnecting = false; // Флаг для предотвращения повторного подключения
     
     // STUN сервер для WebRTC
     this.iceServers = [
@@ -56,12 +57,20 @@ class VoiceTranslationApp {
   }
   
   async connectToServer() {
+    // Проверяем, не выполняется ли уже подключение
+    if (this.isConnecting) {
+      return; // Предотвращаем повторное подключение
+    }
+    
+    this.isConnecting = true; // Устанавливаем флаг подключения
+    
     try {
       // Инициализируем WebRTC и получаем доступ к аудио
       const audioAccess = await this.initAudio();
       
       if (!audioAccess) {
         alert('Не удалось получить доступ к микрофону');
+        this.isConnecting = false; // Сбрасываем флаг
         return;
       }
       
@@ -71,12 +80,33 @@ class VoiceTranslationApp {
       
       if (!roomId) {
         alert('Please enter a Room ID');
+        this.isConnecting = false; // Сбрасываем флаг
         return;
       }
       
       // Подключаемся к WebSocket серверу с параметрами userId и roomId
       const wsUrl = `ws://localhost:3000?userId=${encodeURIComponent(this.userId)}&roomId=${encodeURIComponent(roomId)}`;
       this.ws = new WebSocket(wsUrl);
+      
+      // Сбрасываем флаг подключения при успешном открытии соединения
+      this.ws.onopen = () => {
+        console.log('Соединение с сервером установлено');
+        this.isConnected = true;
+        this.isConnecting = false; // Сбрасываем флаг подключения
+        this.connectionStatusText.textContent = 'Connected';
+        this.updateUI();
+        
+        // Отправляем информацию о пользователе на сервер
+        this.sendToServer({
+          type: 'user_info',
+          userId: this.userId,
+          myLanguage: document.getElementById('myLanguage').value,
+          partnerLanguage: document.getElementById('partnerLanguage').value
+        });
+        
+        // Запускаем измерение latency
+        this.startLatencyMeasurement();
+      };
       
       this.ws.onopen = () => {
         console.log('Соединение с сервером установлено');
@@ -114,6 +144,7 @@ class VoiceTranslationApp {
         this.isInCall = false;
         this.isInRoom = false;
         this.hasPartner = false;
+        this.isConnecting = false; // Сбрасываем флаг подключения
         this.connectionStatusText.textContent = 'Disconnected';
         this.roomStatusText.textContent = 'Not in room';
         this.updateUI();
@@ -121,11 +152,13 @@ class VoiceTranslationApp {
       
       this.ws.onerror = (error) => {
         console.error('Ошибка WebSocket соединения:', error);
+        this.isConnecting = false; // Сбрасываем флаг подключения
         this.connectionStatusText.textContent = 'Error';
         this.updateUI();
       };
     } catch (error) {
       console.error('Ошибка при подключении:', error);
+      this.isConnecting = false; // Сбрасываем флаг подключения
       this.connectionStatusText.textContent = 'Connection Error';
       this.updateUI();
     }
@@ -139,6 +172,7 @@ class VoiceTranslationApp {
     this.isConnected = false;
     this.isInRoom = false;
     this.hasPartner = false;
+    this.isConnecting = false; // Сбрасываем флаг подключения
     this.connectionStatusText.textContent = 'Disconnected';
     this.roomStatusText.textContent = 'Not in room';
     
@@ -174,6 +208,7 @@ class VoiceTranslationApp {
     } catch (error) {
       console.error('Ошибка при доступе к микрофону:', error);
       this.micStatusText.textContent = 'Error';
+      this.isConnecting = false; // Сбрасываем флаг подключения
       this.updateUI();
       return false;
     }
