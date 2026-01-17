@@ -246,15 +246,15 @@
 
     <script src="app.js"></script>
     <script>
-        // Generate a random user ID on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            // Используем ту же функцию генерации ID, что и в app.js
-            const userId = 'user_' + Math.random().toString(36).substr(2, 9);
-            document.getElementById('userIdDisplay').textContent = userId;
-            
-            const suggestedRoomId = `room${Math.floor(1 + Math.random() * 100)}`;
-            document.getElementById('roomId').placeholder = `e.g. ${suggestedRoomId}`;
-        });
+        // Copy user ID to clipboard
+        window.copyUserId = function() {
+            const userId = document.getElementById('userIdDisplay').textContent;
+            navigator.clipboard.writeText(userId).then(function() {
+                alert('User ID copied to clipboard!');
+            }).catch(function(err) {
+                console.error('Could not copy text: ', err);
+            });
+        }
 
         // Copy user ID to clipboard
         function copyUserId() {
