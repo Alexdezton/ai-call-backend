@@ -1,11 +1,11 @@
-// Генерация случайного ID сессии для пользователя
-function generateSessionId() {
-  return 'session_' + Math.random().toString(36).substr(2, 9);
+// Генерация случайного ID пользователя
+function generateUserId() {
+  return 'user_' + Math.random().toString(36).substr(2, 9);
 }
 
 class VoiceTranslationApp {
   constructor() {
-    this.sessionId = generateSessionId();
+    this.userId = generateUserId();
     this.localStream = null;
     this.remoteStream = null;
     this.peerConnection = null;
@@ -39,8 +39,8 @@ class VoiceTranslationApp {
     this.localAudio = document.getElementById('localAudio');
     this.remoteAudio = document.getElementById('remoteAudio');
     
-    // Устанавливаем сгенерированный ID сессии в UI
-    this.userIdDisplay.textContent = this.sessionId;
+    // Устанавливаем сгенерированный ID пользователя в UI
+    this.userIdDisplay.textContent = this.userId;
   }
   
   setupEventListeners() {
@@ -59,8 +59,18 @@ class VoiceTranslationApp {
         return;
       }
       
-      // Подключаемся к WebSocket серверу
-      this.ws = new WebSocket('ws://localhost:3000');
+      // Получаем Room ID из поля ввода
+      const roomIdInput = document.getElementById('roomId');
+      const roomId = roomIdInput.value.trim();
+      
+      if (!roomId) {
+        alert('Please enter a Room ID');
+        return;
+      }
+      
+      // Подключаемся к WebSocket серверу с параметрами userId и roomId
+      const wsUrl = `ws://localhost:3000?userId=${encodeURIComponent(this.sessionId)}&roomId=${encodeURIComponent(roomId)}`;
+      this.ws = new WebSocket(wsUrl);
       
       this.ws.onopen = () => {
         console.log('Соединение с сервером установлено');
@@ -68,10 +78,10 @@ class VoiceTranslationApp {
         this.connectionStatusText.textContent = 'Connected';
         this.updateUI();
         
-        // Отправляем информацию о сессии на сервер
+        // Отправляем информацию о пользователе на сервер
         this.sendToServer({
-          type: 'session_info',
-          sessionId: this.sessionId,
+          type: 'user_info',
+          userId: this.userId,
           myLanguage: document.getElementById('myLanguage').value,
           partnerLanguage: document.getElementById('partnerLanguage').value
         });
