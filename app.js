@@ -20,7 +20,6 @@ class VoiceTranslationApp {
     this.microphone = null;
     this.mediaRecorder = null;
     this.isConnecting = false; // Флаг для предотвращения повторного подключения
-    this.roomIdErrorDisplayed = false; // Флаг для предотвращения повторного отображения ошибки ввода Room ID
     
     // STUN сервер для WebRTC
     this.iceServers = [
@@ -80,15 +79,15 @@ class VoiceTranslationApp {
       const roomId = roomIdInput.value.trim();
       
       if (!roomId) {
-        // Проверяем, не отображается ли уже ошибка
-        if (!this.roomIdErrorDisplayed) {
-          alert('Please enter a Room ID');
-          this.roomIdErrorDisplayed = true; // Устанавливаем флаг, что ошибка отображена
-        
-          // Сбрасываем флаг через короткий промежуток времени, чтобы пользователь мог снова попробовать
+        // Показываем ошибку в интерфейсе вместо alert
+        const errorElement = document.getElementById('roomIdError');
+        if (errorElement) {
+          errorElement.style.display = 'block';
+          
+          // Скрываем сообщение об ошибке через 3 секунды
           setTimeout(() => {
-            this.roomIdErrorDisplayed = false;
-          }, 1000); // 1 секунды достаточно, чтобы пользователь отреагировал
+            errorElement.style.display = 'none';
+          }, 3000);
         }
         this.isConnecting = false; // Сбрасываем флаг
         return;
