@@ -2,12 +2,14 @@ import { WebSocket, WebSocketServer } from 'ws';
 import http from 'http';
 import { URL } from 'url';
 
-const app = express();
-const server = http.createServer(app);
+const server = http.createServer();
 const wss = new WebSocketServer({ server });
 
 // Store rooms for calls
 const rooms = new Map();
+
+// Store user connections separately from rooms
+const userConnections = new Map();
 
 wss.on('connection', (ws, req) => {
   console.log("client connected");
@@ -26,14 +28,27 @@ wss.on('connection', (ws, req) => {
 
   console.log(`New connection: ${userId} in room ${roomId}`);
 
+  // Check if user already has an active connection
+  if (userConnections.has(userId)) {
+    // Close the old connection
+    const oldWs = userConnections.get(userId);
+    oldWs.close(4005, "User reconnected from another device");
+    console.log(`Closed old connection for user: ${userId}`);
+  }
+
+  // Store the new connection
+  userConnections.set(userId, ws);
+
   // Check if room exists
   let room = rooms.get(roomId);
   
   if (!room) {
     // Create new room with first user
     room = {
-      [userId]: ws
+      users: new Map(),
+      createdAt: Date.now()
     };
+    room.users.set(userId, ws);
     rooms.set(roomId, room);
     console.log(`Created new room: ${roomId} with user: ${userId}`);
     
@@ -45,32 +60,36 @@ wss.on('connection', (ws, req) => {
     }));
   } else {
     // Room exists, check if there's space
-    const existingUsers = Object.keys(room);
+    const existingUserIds = Array.from(room.users.keys());
     
-    if (existingUsers.length >= 2) {
+    if (existingUserIds.length >= 2) {
       // Room is full
       console.log(`Room ${roomId} is full, rejecting connection for ${userId}`);
       ws.close(4003, "Room full");
+      // Clean up user connection from map
+      userConnections.delete(userId);
       return;
     }
     
-    if (existingUsers.includes(userId)) {
-      // User already in room
+    if (existingUserIds.includes(userId)) {
+      // User already in room - this shouldn't happen if we handled reconnection properly above
       console.log(`User ${userId} already exists in room ${roomId}`);
       ws.close(4004, "User already in room");
+      // Clean up user connection from map
+      userConnections.delete(userId);
       return;
     }
     
     // Add second user to room
-    room[userId] = ws;
-    rooms.set(roomId, room);
+    room.users.set(userId, ws);
     console.log(`Added user ${userId} to existing room: ${roomId}`);
     
     // Get the other user in the room
-    const otherUser = existingUsers.find(u => u !== userId);
+    const otherUser = existingUserIds.find(u => u !== userId);
     
     // Notify both users that they are connected
-    room[otherUser].send(JSON.stringify({
+    const otherWs = room.users.get(otherUser);
+    otherWs.send(JSON.stringify({
       type: 'partner_found',
       userId: otherUser,
       partnerId: userId,
@@ -117,10 +136,10 @@ wss.on('connection', (ws, req) => {
           const room = rooms.get(roomId);
           if (room) {
             // Find the other user in the room
-            const otherUser = Object.keys(room).find(u => u !== userId);
+            const otherUser = Array.from(room.users.keys()).find(u => u !== userId);
             if (otherUser) {
               // Forward the message to the other user
-              const recipientWs = room[otherUser];
+              const recipientWs = room.users.get(otherUser);
               if (recipientWs && recipientWs.readyState === WebSocket.OPEN) {
                 recipientWs.send(JSON.stringify(message));
                 console.log(`Forwarded ${message.type} from ${userId} to ${otherUser} in room ${roomId}`);
@@ -160,19 +179,19 @@ wss.on('connection', (ws, req) => {
     // Remove user from room
     const room = rooms.get(roomId);
     if (room) {
-      delete room[userId];
+      room.users.delete(userId);
       
       // Check if room is now empty or has only one user
-      const remainingUsers = Object.keys(room);
+      const remainingUserIds = Array.from(room.users.keys());
       
-      if (remainingUsers.length === 0) {
+      if (remainingUserIds.length === 0) {
         // Remove empty room
         rooms.delete(roomId);
         console.log(`Removed empty room: ${roomId}`);
-      } else if (remainingUsers.length === 1) {
+      } else if (remainingUserIds.length === 1) {
         // Notify remaining user that their partner left
-        const remainingUser = remainingUsers[0];
-        const remainingWs = room[remainingUser];
+        const remainingUser = remainingUserIds[0];
+        const remainingWs = room.users.get(remainingUser);
         
         if (remainingWs && remainingWs.readyState === WebSocket.OPEN) {
           remainingWs.send(JSON.stringify({
@@ -188,6 +207,9 @@ wss.on('connection', (ws, req) => {
         console.log(`Room ${roomId} now has only one user: ${remainingUser}`);
       }
     }
+    
+    // Clean up user connection from global map
+    userConnections.delete(userId);
     
     // Clean up connection reference
     ws.userId = null;
