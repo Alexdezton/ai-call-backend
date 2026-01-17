@@ -1,7 +1,7 @@
 {
   "name": "ai-call-backend",
   "version": "1.0.0",
-  "description": "Backend proxy for OpenAI Realtime API",
+  "description": "Backend server for real-time voice translation calls with room-based connections and latency measurement",
   "main": "server.js",
   "type": "module",
   "scripts": {
