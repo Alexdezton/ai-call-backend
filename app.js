@@ -89,7 +89,10 @@ class VoiceTranslationApp {
             errorElement.style.display = 'none';
           }, 3000);
         }
-        this.isConnecting = false; // Сбрасываем флаг
+        // НЕ сбрасываем флаг isConnecting здесь, чтобы предотвратить повторный вызов до завершения обработки
+        setTimeout(() => {
+          this.isConnecting = false; // Сбрасываем флаг через небольшой промежуток времени
+        }, 100); // 100 миллисекунд достаточно, чтобы предотвратить повторный вызов
         return;
       }
       
