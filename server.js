@@ -84,8 +84,9 @@ wss.on('connection', (ws, req) => {
     room.users.set(userId, ws);
     console.log(`Added user ${userId} to existing room: ${roomId}`);
     
-    // Get the other user in the room
-    const otherUser = existingUserIds.find(u => u !== userId);
+    // Get the other user in the room (after adding current user)
+    const allUserIds = Array.from(room.users.keys());
+    const otherUser = allUserIds.find(u => u !== userId);
     
     // Notify both users that they are connected
     const otherWs = room.users.get(otherUser);
