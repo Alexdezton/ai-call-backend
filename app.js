@@ -5,6 +5,15 @@ function generateUserId() {
 
 class VoiceTranslationApp {
   constructor() {
+    // Проверяем, не инициализировано ли приложение дважды
+    if (window.voiceTranslationAppInstance) {
+      console.warn('Приложение уже инициализировано, прекращаем создание нового экземпляра');
+      return;
+    }
+    
+    // Устанавливаем глобальный флаг инициализации
+    window.voiceTranslationAppInstance = this;
+    
     this.userId = generateUserId();
     this.localStream = null;
     this.remoteStream = null;
@@ -612,7 +621,9 @@ class VoiceTranslationApp {
 
 // Инициализация приложения после загрузки DOM
 document.addEventListener('DOMContentLoaded', () => {
-  window.app = new VoiceTranslationApp();
+  if (!window.voiceTranslationAppInstance) {
+    window.app = new VoiceTranslationApp();
+  }
 });
 
 // Функция для копирования ID пользователя
