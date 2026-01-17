@@ -256,15 +256,6 @@
             });
         }
 
-        // Copy user ID to clipboard
-        function copyUserId() {
-            const userId = document.getElementById('userIdDisplay').textContent;
-            navigator.clipboard.writeText(userId).then(function() {
-                alert('User ID copied to clipboard!');
-            }).catch(function(err) {
-                console.error('Could not copy text: ', err);
-            });
-        }
 
         // Регистрация service worker
         if ('serviceWorker' in navigator) {
