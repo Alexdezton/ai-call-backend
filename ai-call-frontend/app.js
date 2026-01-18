@@ -78,8 +78,23 @@ class VoiceTranslationApp {
       this.roomId = this.roomInputId.value.trim();
       
       if (!this.roomId) {
-        alert('Please enter Room ID');
-        this.isConnecting = false; // Сбрасываем флаг подключения
+        // Показываем ошибку в интерфейсе вместо alert
+        const errorElement = document.getElementById('roomIdError');
+        if (errorElement) {
+          errorElement.style.display = 'block';
+          
+          // Скрываем сообщение об ошибке через 3 секунды
+          setTimeout(() => {
+            errorElement.style.display = 'none';
+          }, 3000);
+        }
+        
+        // Сбрасываем флаг подключения, чтобы пользователь мог снова попробовать подключиться
+        // Но устанавливаем небольшую задержку, чтобы избежать повторного быстрого нажатия
+        setTimeout(() => {
+          this.isConnecting = false;
+        }, 300); // 300мс задержки перед сбросом флага
+        
         return;
       }
       
