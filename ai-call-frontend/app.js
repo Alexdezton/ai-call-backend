@@ -586,17 +586,13 @@ class VoiceTranslationApp {
 
 // Инициализация приложения после загрузки DOM
 document.addEventListener('DOMContentLoaded', () => {
-  window.app = new VoiceTranslationApp();
-  
- // Добавляем тестовое подключение
-  const testBtn = document.getElementById('connectTestBtn');
-  if (testBtn) {
-    testBtn.addEventListener('click', () => {
-      const testWs = new WebSocket('wss://ai-call-backend-esj7.onrender.com');
-      testWs.onopen = () => console.log('Connection OK');
-      testWs.onerror = (err) => console.error('Connection Failed', err);
-    });
+  if (!window.voiceTranslationAppInstance) {
+    window.app = new VoiceTranslationApp();
+    window.voiceTranslationAppInstance = window.app;
   }
+  
+  // Удаляем тестовое подключение, так как кнопка connectTestBtn не существует в HTML
+  // и этот код создает дополнительное WebSocket-соединение при загрузке DOM
 });
 
 // Функция для копирования ID пользователя
