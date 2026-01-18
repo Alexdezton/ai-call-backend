@@ -32,7 +32,12 @@ wss.on('connection', (ws, req) => {
   if (userConnections.has(userId)) {
     // Close the old connection
     const oldWs = userConnections.get(userId);
-    oldWs.close(4005, "User reconnected from another device");
+    if (oldWs && oldWs.readyState === WebSocket.OPEN) {
+      oldWs.close(4005, "User reconnected from another device");
+    } else if (oldWs && oldWs.readyState === WebSocket.CONNECTING) {
+      // If connection is still establishing, close it too
+      oldWs.close(4005, "User reconnected from another device");
+    }
     console.log(`Closed old connection for user: ${userId}`);
   }
 
