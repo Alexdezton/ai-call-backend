@@ -12,24 +12,30 @@
 
 ## Структура проекта
 Проект разделен на две части:
-- ai-call-backend/: серверная часть приложения
-  - server.js: основной серверный файл с WebSocket-логикой
-  - package.json: файл зависимостей
-- ai-call-frontend/: клиентская часть приложения
-  - app.js: клиентская логика приложения
-  - index.html: основная HTML-страница
-  - manifest.json: файл манифеста для PWA
-  - service-worker.js: сервис-воркер для PWA
-  - assets/: папка с ресурсами
-    - icons/: иконки для PWA
+
+1. ai-call-backend-local/: локальная папка для серверной части приложения
+   - server.js: основной серверный файл с WebSocket-логикой
+   - package.json: файл зависимостей
+   - .git: репозиторий для деплоя на Render (https://github.com/Alexdezton/ai-call-backend)
+
+2. ai-call-frontend-local/: локальная папка для клиентской части приложения
+   - app.js: клиентская логика приложения
+   - index.html: основная HTML-страница
+   - manifest.json: файл манифеста для PWA
+   - service-worker.js: сервис-воркер для PWA
+   - assets/: папка с ресурсами
+     - icons/: иконки для PWA
+   - .git: репозиторий для деплоя на Netlify (https://github.com/Alexdezton/ai-call-frontend)
 
 ## Правила работы с проектом
 1. НЕ ДОБАВЛЯТЬ файл CONTINUATION_AGENT.md в git-репозитории
-2. ai-call-backend содержит только серверную часть (server.js, package.json)
-3. ai-call-frontend содержит только клиентскую часть (app.js, index.html, и т.д.)
+2. ai-call-backend-local содержит только серверную часть (server.js, package.json)
+3. ai-call-frontend-local содержит только клиентскую часть (app.js, index.html, и т.д.)
 4. При внесении изменений убедиться, что вы работаете в правильной директории
 5. Проверить, что изменения применяются к нужным файлам перед коммитом
 6. Удалить скрытые .git папки из подкаталогов, чтобы избежать конфликта репозиториев
+7. Для работы с backend использовать только папку ai-call-backend-local
+8. Для работы с frontend использовать только папку ai-call-frontend-local
 
 ## Задачи для завершения
 
