@@ -20,6 +20,7 @@ class VoiceTranslationApp {
     this.microphone = null;
     this.mediaRecorder = null;
     this.latencyInterval = null;
+    this.isConnecting = false; // Флаг для предотвращения повторного подключения
     
     // STUN сервер для WebRTC
     this.iceServers = [
@@ -65,12 +66,20 @@ class VoiceTranslationApp {
   }
   
   async connectToServer() {
+    // Проверяем, не выполняется ли уже подключение или соединение уже установлено
+    if (this.isConnecting || this.isConnected) {
+      return; // Предотвращаем повторное подключение
+    }
+    
+    this.isConnecting = true; // Устанавливаем флаг подключения ДО всех проверок
+    
     try {
       // Получаем Room ID из поля ввода
       this.roomId = this.roomInputId.value.trim();
       
       if (!this.roomId) {
         alert('Please enter Room ID');
+        this.isConnecting = false; // Сбрасываем флаг подключения
         return;
       }
       
@@ -79,6 +88,7 @@ class VoiceTranslationApp {
       
       if (!audioAccess) {
         alert('Не удалось получить доступ к микрофону');
+        this.isConnecting = false; // Сбрасываем флаг подключения
         return;
       }
       
@@ -133,6 +143,7 @@ class VoiceTranslationApp {
         this.isInCall = false;
         this.isInRoom = false;
         this.hasPartner = false;
+        this.isConnecting = false; // Сбрасываем флаг подключения
         this.connectionStatusText.textContent = 'Disconnected';
         this.updateUI();
         
@@ -142,11 +153,13 @@ class VoiceTranslationApp {
       
       this.ws.onerror = (error) => {
         console.error('Ошибка WebSocket соединения:', error);
+        this.isConnecting = false; // Сбрасываем флаг подключения
         this.connectionStatusText.textContent = 'Error';
         this.updateUI();
       };
     } catch (error) {
       console.error('Ошибка при подключении:', error);
+      this.isConnecting = false; // Сбрасываем флаг подключения
       this.connectionStatusText.textContent = 'Connection Error';
       this.updateUI();
     }
@@ -162,6 +175,7 @@ class VoiceTranslationApp {
     this.isInCall = false;
     this.isInRoom = false;
     this.hasPartner = false;
+    this.isConnecting = false; // Сбрасываем флаг подключения
     this.connectionStatusText.textContent = 'Disconnected';
     this.updateUI();
   }
