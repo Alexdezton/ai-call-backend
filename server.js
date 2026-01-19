@@ -164,6 +164,12 @@ wss.on('connection', (ws, req) => {
   // Store references to userId and roomId for later use
   ws.userId = userId;
   ws.roomId = roomId;
+  
+  // Setup heartbeat mechanism to keep connection alive
+  ws.isAlive = true;
+  ws.on('pong', () => {
+    ws.isAlive = true;
+  });
 
   // Update user connection mapping
   userConnections.set(userId, ws);
@@ -312,6 +318,9 @@ wss.on('connection', (ws, req) => {
     // Clean up connection reference
     ws.userId = null;
     ws.roomId = null;
+    
+    // Clear the heartbeat reference
+    ws.isAlive = false;
   });
 
   ws.on('error', (error) => {
@@ -340,6 +349,23 @@ wss.on('connection', (ws, req) => {
 
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0'; // Listen on all network interfaces for Render deployment
+
+// Setup heartbeat interval to ping clients periodically
+const heartbeatInterval = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.isAlive === false) {
+      console.log(`Terminating inactive WebSocket connection for user ${ws.userId} in room ${ws.roomId}`);
+      return ws.terminate();
+    }
+
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 30000); // Ping every 30 seconds
+
+wss.on('close', () => {
+  clearInterval(heartbeatInterval);
+});
 
 server.listen(PORT, HOST, () => {
   console.log(`Server listening on ${HOST}:${PORT}`);
