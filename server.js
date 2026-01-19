@@ -2,8 +2,13 @@ import { WebSocket, WebSocketServer } from 'ws';
 import http from 'http';
 import { URL } from 'url';
 
+// Configure server to listen on the port specified by Render environment or default to 3000
 const server = http.createServer();
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({
+  server,
+  // Allow all origins in this basic configuration
+  // In production, you'd want to restrict this to your frontend domain
+});
 
 // Store rooms for calls
 const rooms = new Map();
@@ -41,9 +46,6 @@ wss.on('connection', (ws, req) => {
     console.log(`Closed old connection for user: ${userId}`);
   }
 
-  // Store the new connection
-  userConnections.set(userId, ws);
-
   // Check if room exists
   let room = rooms.get(roomId);
   
@@ -68,53 +70,76 @@ wss.on('connection', (ws, req) => {
     const existingUserIds = Array.from(room.users.keys());
     
     if (existingUserIds.length >= 2) {
-      // Room is full
-      console.log(`Room ${roomId} is full, rejecting connection for ${userId}`);
-      ws.close(4003, "Room full");
-      // Clean up user connection from map
-      userConnections.delete(userId);
-      return;
-    }
-    
-    if (existingUserIds.includes(userId)) {
-      // User already in room - this shouldn't happen if we handled reconnection properly above
-      console.log(`User ${userId} already exists in room ${roomId}`);
-      ws.close(4004, "User already in room");
-      // Clean up user connection from map
-      userConnections.delete(userId);
-      return;
-    }
-    
-    // Add second user to room
-    room.users.set(userId, ws);
-    console.log(`Added user ${userId} to existing room: ${roomId}`);
-    
-    // Get the other user in the room (after adding current user)
-    const allUserIds = Array.from(room.users.keys());
-    const otherUser = allUserIds.find(u => u !== userId);
-    
-    // Notify both users that they are connected
-    const otherWs = room.users.get(otherUser);
-    otherWs.send(JSON.stringify({
-      type: 'partner_found',
-      userId: otherUser,
-      partnerId: userId,
-      roomId: roomId
-    }));
+      // Check if the connecting user is already in the room (reconnection scenario)
+      if (existingUserIds.includes(userId)) {
+        // This is a reconnection - replace the old connection with the new one
+        const oldWs = room.users.get(userId);
+        if (oldWs && oldWs !== ws) {
+          // Close the old connection
+          oldWs.close(4005, "User reconnected from another device");
+          console.log(`Replaced old connection for user ${userId} in room ${roomId}`);
+        }
+        
+        // Update the connection in the room
+        room.users.set(userId, ws);
+      } else {
+        // Room is full with different users
+        console.log(`Room ${roomId} is full, rejecting connection for ${userId}`);
+        ws.close(4003, "Room full");
+        // Clean up user connection from map
+        userConnections.delete(userId);
+        return;
+      }
+    } else {
+      // There's space in the room - check if user is reconnecting
+      if (existingUserIds.includes(userId)) {
+        // User is reconnecting - replace the old connection
+        const oldWs = room.users.get(userId);
+        if (oldWs && oldWs !== ws) {
+          oldWs.close(4005, "User reconnected from another device");
+          console.log(`Replaced old connection for user ${userId} in room ${roomId}`);
+        }
+        
+        // Update the connection in the room
+        room.users.set(userId, ws);
+      } else {
+        // Add second user to room
+        room.users.set(userId, ws);
+        console.log(`Added user ${userId} to existing room: ${roomId}`);
+        
+        // Get the other user in the room (after adding current user)
+        const allUserIds = Array.from(room.users.keys());
+        const otherUser = allUserIds.find(u => u !== userId);
+        
+        // Notify both users that they are connected
+        const otherWs = room.users.get(otherUser);
+        if (otherWs && otherWs.readyState === WebSocket.OPEN) {
+          otherWs.send(JSON.stringify({
+            type: 'partner_found',
+            userId: otherUser,
+            partnerId: userId,
+            roomId: roomId
+          }));
+        }
 
-    ws.send(JSON.stringify({
-      type: 'partner_found',
-      userId: userId,
-      partnerId: otherUser,
-      roomId: roomId
-    }));
+        ws.send(JSON.stringify({
+          type: 'partner_found',
+          userId: userId,
+          partnerId: otherUser,
+          roomId: roomId
+        }));
 
-    console.log(`Users paired in room ${roomId}: ${otherUser} and ${userId}`);
+        console.log(`Users paired in room ${roomId}: ${otherUser} and ${userId}`);
+      }
+    }
   }
-
+  
   // Store references to userId and roomId for later use
   ws.userId = userId;
   ws.roomId = roomId;
+
+  // Update user connection mapping
+  userConnections.set(userId, ws);
 
   ws.on('message', (data) => {
     try {
@@ -125,17 +150,33 @@ wss.on('connection', (ws, req) => {
         // Log the message
         console.log(`Received message from ${userId} in room ${roomId}:`, message);
         
+        // Validate message structure
+        if (typeof message !== 'object' || message === null) {
+          console.log(`Invalid message format from ${userId}:`, message);
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'warning',
+              message: 'Invalid message format'
+            }));
+          }
+          return;
+        }
+        
         // Check if message is a WebRTC message
         if (message.type === 'offer' || message.type === 'answer' || message.type === 'ice_candidate') {
-          // Validate message format
-          if (typeof message !== 'object' || message === null) {
-            console.log(`Invalid WebRTC message format from ${userId}:`, message);
-            if (ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({
-                type: 'warning',
-                message: 'Invalid WebRTC message format'
-              }));
-            }
+          // Additional validation for WebRTC messages
+          if (message.type === 'offer' && !message.sdp) {
+            console.log(`Invalid offer message from ${userId}: missing SDP`, message);
+            return;
+          }
+          
+          if (message.type === 'answer' && !message.sdp) {
+            console.log(`Invalid answer message from ${userId}: missing SDP`, message);
+            return;
+          }
+          
+          if (message.type === 'ice_candidate' && !message.candidate) {
+            console.log(`Invalid ice_candidate message from ${userId}: missing candidate`, message);
             return;
           }
           
@@ -160,12 +201,18 @@ wss.on('connection', (ws, req) => {
           }
         } else if (message.type === 'ping') {
           // Respond with pong with the same timestamp for latency measurement
-          if (ws.readyState === WebSocket.OPEN) {
+          if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
               type: 'pong',
               timestamp: message.timestamp
             }));
           }
+        } else if (message.type === 'user_info') {
+          // Handle user info message
+          console.log(`Received user info from ${userId}:`, {
+            myLanguage: message.myLanguage,
+            partnerLanguage: message.partnerLanguage
+          });
         } else {
           // Handle other message types if needed
           console.log(`Received non-WebRTC message from ${userId}:`, message);
@@ -177,7 +224,7 @@ wss.on('connection', (ws, req) => {
     } catch (error) {
       console.error("Invalid JSON received:", error.message);
       // Don't close connection on error, just log it and continue
-      if (ws.readyState === WebSocket.OPEN) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
           type: 'warning',
           message: 'Invalid JSON received',
@@ -189,6 +236,12 @@ wss.on('connection', (ws, req) => {
 
   ws.on('close', (code, reason) => {
     console.log(`Client disconnected: ${userId} from room ${roomId}, code: ${code}, reason: ${reason}`);
+    console.log('Close event details:', {
+      wasClean: 'N/A for server-side',
+      code: code,
+      reason: reason,
+      readyState: ws ? ws.readyState : 'undefined'
+    });
     
     // Remove user from room
     const room = rooms.get(roomId);
@@ -208,13 +261,17 @@ wss.on('connection', (ws, req) => {
         const remainingWs = room.users.get(remainingUser);
         
         if (remainingWs && remainingWs.readyState === WebSocket.OPEN) {
-          remainingWs.send(JSON.stringify({
-            type: 'partner_disconnected',
-            userId: remainingUser,
-            partnerId: userId,
-            roomId: roomId
-          }));
-          console.log(`Notified ${remainingUser} that partner ${userId} disconnected from room ${roomId}`);
+          try {
+            remainingWs.send(JSON.stringify({
+              type: 'partner_disconnected',
+              userId: remainingUser,
+              partnerId: userId,
+              roomId: roomId
+            }));
+            console.log(`Notified ${remainingUser} that partner ${userId} disconnected from room ${roomId}`);
+          } catch (sendError) {
+            console.error(`Failed to notify ${remainingUser} about partner disconnection:`, sendError);
+          }
         }
         
         // Update room state (only one user left)
@@ -232,20 +289,31 @@ wss.on('connection', (ws, req) => {
 
   ws.on('error', (error) => {
     console.error("WebSocket error for user", userId, "in room", roomId, ":", error);
+    console.error("WebSocket readyState:", ws ? ws.readyState : 'undefined');
+    console.error("WebSocket connection details:", {
+      url: req.url,
+      headers: req.headers
+    });
     
     // Don't close connection on error, just log it
     // Send warning to frontend
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
-        type: 'warning',
-        message: 'WebSocket error occurred',
-        error: error.message
-      }));
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      try {
+        ws.send(JSON.stringify({
+          type: 'warning',
+          message: 'WebSocket error occurred',
+          error: error.message
+        }));
+      } catch (sendError) {
+        console.error("Failed to send error message to client:", sendError);
+      }
     }
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+const HOST = process.env.HOST || '0.0.0.0'; // Listen on all network interfaces for Render deployment
+
+server.listen(PORT, HOST, () => {
+  console.log(`Server listening on ${HOST}:${PORT}`);
 });
