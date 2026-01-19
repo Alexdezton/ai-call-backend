@@ -34,7 +34,8 @@ wss.on('connection', (ws, req) => {
   console.log("client connected");
 
   // Parse user ID and room ID from query parameters
-  const parsedUrl = new URL(`http://localhost${req.url}`);
+  // Use the actual request URL instead of hardcoded localhost
+  const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const userId = parsedUrl.searchParams.get('userId');
   const roomId = parsedUrl.searchParams.get('roomId');
 
