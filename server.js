@@ -19,7 +19,19 @@ const wss = new WebSocketServer({
   verifyClient: (info) => {
     // Allow connections from any origin during development
     // In production, you'd want to restrict this to your frontend domain
-    console.log('WebSocket connection request from:', info.origin, info.req.url);
+    console.log('WebSocket connection request from:', info.origin, info.req.url, info.req.headers);
+    
+    // Additional check for Render-specific headers
+    const userAgent = info.req.headers['user-agent'];
+    const forwardedFor = info.req.headers['x-forwarded-for'];
+    const forwardedProto = info.req.headers['x-forwarded-proto'];
+    
+    console.log('Connection details:', {
+      userAgent: userAgent,
+      forwardedFor: forwardedFor,
+      forwardedProto: forwardedProto
+    });
+    
     return true;
   }
 });
