@@ -15,8 +15,13 @@ const server = http.createServer((req, res) => {
 });
 const wss = new WebSocketServer({
   server,
-  // Allow all origins in this basic configuration
-  // In production, you'd want to restrict this to your frontend domain
+  // Enable necessary options for production
+  verifyClient: (info) => {
+    // Allow connections from any origin during development
+    // In production, you'd want to restrict this to your frontend domain
+    console.log('WebSocket connection request from:', info.origin, info.req.url);
+    return true;
+  }
 });
 
 // Store rooms for calls
