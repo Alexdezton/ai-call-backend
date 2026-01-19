@@ -3,7 +3,16 @@ import http from 'http';
 import { URL } from 'url';
 
 // Configure server to listen on the port specified by Render environment or default to 3000
-const server = http.createServer();
+const server = http.createServer((req, res) => {
+  // Basic health check endpoint for Render to detect that the app is running
+  if (req.url === '/' || req.url === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok', message: 'WebSocket server is running' }));
+  } else {
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Not found' }));
+  }
+});
 const wss = new WebSocketServer({
   server,
   // Allow all origins in this basic configuration
